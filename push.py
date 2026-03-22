@@ -6,54 +6,55 @@ PATH = '/storage/emulated/0/YouTube/yt-search-downloader'
 TOKEN = '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'
 USER = 'zenija191'
 REPO = 'YouTube1'
-# Формируем URL с авторизацией, чтобы не спрашивал пароль
 REMOTE_URL = f'https://{TOKEN}@github.com/{USER}/{REPO}.git'
 
 def run_cmd(cmd):
-    """Функция для запуска команд терминала"""
     try:
+        # Добавили подавление лишних запросов
         result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-        print(f"✅ {cmd[:20]}... OK")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Ошибка в команде: {cmd}")
-        print(f"Детали: {e.stderr}")
+        # Если ветки нет, просто идем дальше
+        if "cannot rename" in str(e.stderr):
+            return True
+        print(f"❌ Ошибка в: {cmd}\n{e.stderr}")
         return False
 
 def main():
     if not os.path.exists(PATH):
-        print(f"Ошибка: Путь {PATH} не найден!")
+        print("Путь не найден!")
         return
-
     os.chdir(PATH)
 
-    # 1. Инициализация если нет .git
-    if not os.path.exists('.git'):
-        run_cmd('git init')
-
-    # 2. Настройка удаленного репозитория
-    run_cmd(f'git remote remove origin') # Удаляем старый на всякий случай
+    print("🚀 Начинаю полную очистку и загрузку...")
+    
+    # Инициализация и настройка
+    run_cmd('git init')
+    run_cmd(f'git remote remove origin')
     run_cmd(f'git remote add origin {REMOTE_URL}')
-
-    # 3. Настройка ветки (делаем main основной)
+    
+    # ЗАСТАВЛЯЕМ ГИТ ЗАПОМНИТЬ ТОКЕН (чтобы не просил пароль)
+    run_cmd(f'git config credential.helper store')
+    
+    # Добавление и коммит
+    run_cmd('git add .')
+    run_cmd('git commit -m "Final auto-push"')
+    
+    # Пытаемся переименовать в main, если не выйдет - пушим как есть
     run_cmd('git branch -M main')
 
-    # 4. Добавление файлов
-    print("Индексируем файлы...")
-    run_cmd('git add .')
-
-    # 5. Коммит (если есть что коммитить)
-    run_cmd('git commit -m "Auto-upload from Android"')
-
-    # 6. Финальный пуш (Force push решает проблему с конфликтами)
-    print("Отправка на GitHub (принудительно)...")
-    if run_cmd('git push -f origin main'):
-        print("\n" + "="*30)
-        print("ВСЁ ГОТОВО! Проверяй репозиторий.")
-        print(f"https://github.com/{USER}/{REPO}")
-        print("="*30)
-    else:
-        print("\n❌ Что-то пошло не так. Проверь интернет или токен.")
+    print("📤 Отправка файлов (без пароля)...")
+    # Пробуем пуш в main, если не выйдет - в master
+    try:
+        subprocess.run(f'git push -f origin main', shell=True, check=True)
+        print("✅ УСПЕХ! Все файлы на GitHub в ветке MAIN.")
+    except:
+        try:
+            subprocess.run(f'git push -f origin master', shell=True, check=True)
+            print("✅ УСПЕХ! Все файлы на GitHub в ветке MASTER.")
+        except Exception as e:
+            print(f"❌ Ошибка при пуше: {e}")
 
 if __name__ == "__main__":
     main()
+
